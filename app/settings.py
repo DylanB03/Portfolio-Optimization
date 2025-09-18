@@ -4,6 +4,8 @@ from pydantic import Field
 class ConfigSettings(BaseSettings):
 
     GEMINI_API_KEY: str = Field(...,description="API Key for Gemini LLM Access")
+    
+    GEMINI_MODEL: str = Field('gemini-2.5-flash',description="Name of model for Gemini to use")
 
     model_config = SettingsConfigDict(env_file='.env',env_file_encoding="utf-8")
 

@@ -9,7 +9,8 @@ class GenerateResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     model : str = "gemini-2.5-flash"
-    system_prompt : str = "Respond concisely to the user query"
+    system_prompt : str = "Respond concisely to the user query",
+    tools = list
     messages: list
 
 class ChatResponse(BaseModel):

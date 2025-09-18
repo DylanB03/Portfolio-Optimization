@@ -40,7 +40,12 @@ class GeminiClient:
             model=request.model,
             config = types.GenerateContentConfig(
                 system_instruction=request.system_prompt,
-                thinking_config=types.ThinkingConfig(thinking_budget=0)
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                temperature=0,
+                tools= request.tools,
+                automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(
+                    dsiable=True
+                )
             ),
             contents=request.messages
         )
