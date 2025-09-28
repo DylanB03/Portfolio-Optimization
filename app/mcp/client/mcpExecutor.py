@@ -8,6 +8,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 import json
 from uuid import uuid4
 from app.models import ChatRequest, ChatResponse
+import asyncio
 
 class executionState(TypedDict):
     servers: list
@@ -38,13 +39,13 @@ class mcpExecutor():
         graph = StateGraph(executionState)
         
         graph.add_node("initialize",self.initialize)
-        graph.add_node("getArgument",self.getArguments)
+        graph.add_node("getArguments",self.getArguments)
         graph.add_node("executeTool",self.executeTool)
         graph.add_node("validation",self.validation)
         graph.add_node("finalization",self.finalization)
         graph.add_node("handleErrors",self.handleErrors)
         
-        graph.set_entry_point('initialization')
+        graph.set_entry_point('initialize')
         graph.add_edge('initialize','getArguments')
         graph.add_edge('getArguments','executeTool')
         graph.add_edge('executeTool','validation')
@@ -61,12 +62,15 @@ class mcpExecutor():
         self.workflow = graph.compile()
         
     async def initialize(self,state: executionState) -> executionState:
+        
+        self.logger.info(f'Commencing MCP Initialization')
+        
         self.mcp_headers = {server: {
             "Content-Type": "application/json",
             "Accept" : "application/json, text/event-stream",
             "MCP-Protocol-Version" : "2025-06-18"
             }
-            for server in self.servers     
+            for server in state["servers"]     
         }
         #follow MCP lifecycle, ping, initialize handshake
         for server in state["servers"]:
@@ -97,17 +101,27 @@ class mcpExecutor():
         state["messages"].append({
             'role' : 'model',
             'parts' : [
-                response.response
+                {'text' : response.response}
             ]
         })
         
     async def executeTool(self,state: executionState) -> executionState:
         
+        
+        
+        self.logger.info('Commencing Tool Execution')
+        
     async def validation(self,state: executionState) -> executionState:
+        
+        self.logger.info("Commencing Tool Output Validation")
         
     async def finalization(self, state: executionState) -> executionState:
         
+        self.logger.info("Finalizing Request")
+        
     async def handleErrors(self, state: executionState) -> executionState:
+        
+        self.logger.info("Finalizing Request, Errors Encountered")
         
     async def determineEnd(self, state: executionState) -> str:
         
@@ -265,5 +279,28 @@ class mcpExecutor():
         except Exception as e:
             self.logger.info(f"Failed performing initialization handshake on server {server} : {e}")
                 
-    
+    def visualize_graph(self):
+        try:
+            return self.workflow.get_graph().draw_ascii()
+        except Exception as e:
+            self.logger.info(f'Failed drawing the graph: {e}')
             
+    async def run(self,state: executionState):
+        self.logger.info(f'Commencing a workflow execution')
+        
+        await self.workflow.ainvoke(state)
+        
+    
+
+async def main():
+    mcp = mcpExecutor(GeminiClient())
+    print(mcp.visualize_graph())
+    
+    # state = executionState(
+    #     servers=[], errors = [], execution_log=[], messages = []
+    # )
+    
+    # await mcp.run(state)
+    
+if __name__ == '__main__':
+    asyncio.run(main())

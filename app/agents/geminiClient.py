@@ -34,7 +34,7 @@ class GeminiClient:
         return GenerateResponse(response=response.text)
     
     async def chat_completion(self,request: ChatRequest) -> ChatResponse:
-        self.logger.info(f"sending a chat request {request.prompt}")
+        self.logger.info(f"sending a chat request {request.messages}")
         #pull relevant data from graphdb
         response = self.client.models.generate_content(
             model=request.model,
@@ -44,7 +44,7 @@ class GeminiClient:
                 temperature=0,
                 tools= request.tools,
                 automatic_function_calling=genai.types.AutomaticFunctionCallingConfig(
-                    dsiable=True
+                    disable=True
                 )
             ),
             contents=request.messages
@@ -56,7 +56,24 @@ async def main():
 
     geminiInstance = GeminiClient()
     
-    await geminiInstance.generate_completion(GenerateRequest(prompt='What is the color of the sky and why'))
+    # await geminiInstance.generate_completion(GenerateRequest(prompt='What is the color of the sky and why'))
+    
+    result = await geminiInstance.chat_completion(
+        ChatRequest(
+            tools= [],
+            messages = [{
+                'role' : 'user',
+                'parts' : [
+                    {"text" : 'What is the product of 5 * 10 in binary?'}
+                ]
+            }
+            ]
+        )
+    )
+    
+    print(result)
+    
+    
     
 if __name__ == "__main__":
     asyncio.run(main())
