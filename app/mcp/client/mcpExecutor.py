@@ -12,9 +12,12 @@ import asyncio
 
 class executionState(TypedDict):
     servers: list
+    tools: list
     errors: list
     execution_log: list
     messages: list
+    arguments: str
+    context: list
     
 class mcpExecutor():
     '''
@@ -79,39 +82,88 @@ class mcpExecutor():
             self.logger.info(f'confirmed ping status - {ping_status} and initialized server: {server}')
         
         #now get the tools
-        self.tools = await self.list_tools(state['servers'])
-        self.logger.info(f'Verified the following tools: {self.tools}')
+        state['tools'] = await self.list_tools(state['servers'])
+        self.logger.info(f'Verified the following tools: {state['tools']}')
         
     async def getArguments(self,state: executionState) -> executionState:
         
-        with open('app/prompts/mcpExecutor_getArguments.txt','r') as file:
-            prompt = file.read()
+        try:
+            self.logger.info('Commencing the Argument Generation')
             
-        response = await self.llm.chat_completion(
-            ChatRequest(
-                model = Settings.GEMINI_MODEL,
-                system_prompt=prompt,
-                messages = state['messages'],
-                tools = self.tools
+            with open('app/prompts/mcpExecutor_getArguments.txt','r') as file:
+                prompt = file.read()
+                
+            response = await self.llm.chat_completion(
+                ChatRequest(
+                    model = Settings.GEMINI_MODEL,
+                    system_prompt=prompt,
+                    messages = state['messages'],
+                    tools = state['tools']
+                )
             )
-        )
-        
-        self.logger.info(f'Received the following arguments for a tool call: {response.response}')
-        
-        state["messages"].append({
-            'role' : 'model',
-            'parts' : [
-                {'text' : response.response}
-            ]
-        })
+                    
+            state['arguments'] = response.response
+            
+            self.logger.info(f'Received the following arguments for a tool call: {state["arguments"]}')
+            
+            state["messages"].append({
+                'role' : 'model',
+                'parts' : [
+                    {'text' : state['arguments']}
+                ]
+            })
+        except Exception as e:
+            self.logger.info(f'Failure in the Argument Generation')
         
     async def executeTool(self,state: executionState) -> executionState:
         
+        try:
+            self.logger.info('Commencing Tool Execution')
+            
+            if state['arguments'].get('completed'):
+                self.logger.info('Determined that current context satisfies request, tool execution not required')
+                return state
+            
+            tool, args = state['arguments'].get('tool'), state['arguments'].get('args')
+            
+            if tool is None or args is None:
+                self.logger.error(f'Did not receive any arguments or args')
+            
+            response = await self.tool_call(
+                tool = tool,
+                args = args,
+                tools = state['tools']
+            )
+            
+            if 'error' in json.loads(response.lower()):
+                state['messages'].append({
+                    'role' : 'user',
+                    'parts' : [
+                        {
+                        'text' : f'Error encounterd in tool execution. Given the tool response, return a new set of parameters to successfully satisfy the user request. TOOL RESPONSE: {response}.'
+                        }
+                    ]
+                })
+            else:
+                state['context'].append(response)
+                state['messages'].append({
+                    'role' : 'user',
+                    'parts' : [
+                        {
+                            'text' : f'Given the new context, reconsider the initial query following the initial guidelines. NEW CONTEXT: {response}'
+                        }
+                    ]
+                })
+            
+        except Exception as e:
+            self.logger.info(f'Failure in the tool execution: {e}')
         
+        return state
         
-        self.logger.info('Commencing Tool Execution')
         
     async def validation(self,state: executionState) -> executionState:
+        
+        
         
         self.logger.info("Commencing Tool Output Validation")
         
@@ -181,7 +233,7 @@ class mcpExecutor():
         except Exception as e:
             self.logger.error(f"Failed to list tools: {e}")
             
-    async def tool_call(self, tool: str, args: dict):
+    async def tool_call(self, tool: str, args: dict, tools: list):
         def convert_value(val):
             if isinstance(val, str):
                 if val.lower() == "true":
@@ -209,7 +261,7 @@ class mcpExecutor():
             #find the url that it relates to
 
             url = None
-            for k,v in self.tools:
+            for k,v in tools:
                 if tool in json.dumps(v):
                     url = k
             if not url:
