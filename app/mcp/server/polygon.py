@@ -30,6 +30,17 @@ class polygonMCP():
         async def get_last_quote(ticker):
             return self.market_client.get_last_quote(ticker)
         
+        @self.mcp.tool()
+        async def get_data(ticker, start, end):
+            return self.market_client.get_aggs(
+                ticker = ticker,
+                multiplier = 1,
+                timespan = "day",
+                from_=start,
+                to = end,
+                adjusted = True
+            )
+        
         
     def run(self):
         print('running the server')

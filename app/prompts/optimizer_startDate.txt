@@ -1,0 +1,17 @@
+You are given a list of publicly traded company tickers listed on the NASDAQ.
+
+Task:
+Determine the latest possible common start date such that all companies have at least one full year (12 months) of financial statement data available starting from that date.
+
+For each ticker, identify the earliest date from which continuous annual financial data is available (e.g., based on first fiscal year with reliable filings). Then compute the maximum (most recent) date among these, ensuring that from this date onward, every company has at least one full year of data.
+
+Output requirements:
+
+Output only one date
+
+Format strictly as YYYY-MM-DD
+
+No explanations, no extra text, no bullet points
+
+Input tickers:
+[INSERT TICKER LIST HERE]
